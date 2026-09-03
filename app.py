@@ -128,14 +128,14 @@ with tab1:
             sample_choice = st.selectbox("Select Sample Face:", [f.name for f in sample_files])
             selected_path = config.SAMPLES_DIR / sample_choice
             selected_image_input = str(selected_path)
-            st.image(Image.open(selected_path), caption=f"Sample: {sample_choice}", use_column_width=True)
+            st.image(Image.open(selected_path), caption=f"Sample: {sample_choice}", use_container_width=True)
             
         else:
             uploaded_file = st.file_uploader("Upload Face Image (JPG/PNG)", type=["jpg", "jpeg", "png"])
             if uploaded_file is not None:
                 pil_img = Image.open(uploaded_file)
                 selected_image_input = pil_img
-                st.image(pil_img, caption="Uploaded Face Scan", use_column_width=True)
+                st.image(pil_img, caption="Uploaded Face Scan", use_container_width=True)
 
         run_btn = st.button("⚡ Execute End-to-End Pipeline", type="primary", use_container_width=True)
 
@@ -157,7 +157,7 @@ with tab1:
                 c1, c2 = st.columns(2)
                 with c1:
                     annotated_rgb = cv2.cvtColor(result.face_scan.annotated_image, cv2.COLOR_BGR2RGB)
-                    st.image(annotated_rgb, caption="Annotated Face Scan Bounding Box", use_column_width=True)
+                    st.image(annotated_rgb, caption="Annotated Face Scan Bounding Box", use_container_width=True)
                 with c2:
                     st.markdown(f"**Bounding Box:** `{result.face_scan.bounding_box}`")
                     st.markdown(f"**Face SHA-256 Hash:**")
@@ -172,7 +172,7 @@ with tab1:
                 col_post1, col_post2 = st.columns([1, 2])
                 with col_post1:
                     if match.post_image_url.startswith("http"):
-                        st.image(match.post_image_url, caption=f"{match.platform} Post Image", use_column_width=True)
+                        st.image(match.post_image_url, caption=f"{match.platform} Post Image", use_container_width=True)
                     else:
                         st.info("No remote image preview")
                 with col_post2:
