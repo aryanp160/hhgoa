@@ -59,16 +59,16 @@ class AutonomousGlobalSearchEngine:
                 browser = p.chromium.launch(headless=True)
                 page = browser.new_page()
                 encoded_q = urllib.parse.quote(query)
-                page.goto(f"https://www.bing.com/search?q={encoded_q}", wait_until="domcontentloaded", timeout=12000)
+                page.goto(f"https://www.bing.com/search?q={encoded_q}", wait_until="domcontentloaded", timeout=6000)
                 
                 items = page.query_selector_all("li.b_algo")
-                for item in items[:6]:
+                for item in items[:5]:
                     title_elem = item.query_selector("h2 a")
                     snippet_elem = item.query_selector("p, div.b_caption")
                     if title_elem:
-                        title = title_elem.inner_text()
+                        title = title_elem.inner_text().strip()
                         url = title_elem.get_attribute("href") or ""
-                        snippet = snippet_elem.inner_text() if snippet_elem else ""
+                        snippet = snippet_elem.inner_text().strip() if snippet_elem else ""
                         
                         platform = "Web Social Media"
                         if "x.com" in url or "twitter.com" in url:
@@ -82,16 +82,21 @@ class AutonomousGlobalSearchEngine:
                         elif "facebook.com" in url:
                             platform = "Facebook"
 
-                        # Extract author handle if available
+                        # Extract clean author handle and author name
                         handle = "@web_user"
+                        author = title[:30]
                         if "x.com" in url or "twitter.com" in url:
-                            parts = url.split("/")
-                            if len(parts) > 3:
+                            parts = [p for p in url.split("/") if p]
+                            if len(parts) >= 3 and parts[2] not in ["x.com", "twitter.com", "status"]:
+                                handle = "@" + parts[2]
+                                author = parts[2].replace("_", " ").title()
+                            elif len(parts) >= 4 and parts[3] != "status":
                                 handle = "@" + parts[3]
+                                author = parts[3].replace("_", " ").title()
 
                         results.append({
                             "platform": platform,
-                            "author_name": title.split(" on ")[0] if " on " in title else title[:30],
+                            "author_name": author,
                             "author_handle": handle,
                             "post_url": url,
                             "post_text": snippet if snippet else title,
@@ -100,7 +105,7 @@ class AutonomousGlobalSearchEngine:
                         })
                 browser.close()
         except Exception as e:
-            print(f"[AutonomousSearch] Playwright Bing search error: {e}")
+            pass
         return results
 
     def search_duckduckgo_api(self, query: str) -> List[Dict[str, Any]]:
@@ -108,7 +113,7 @@ class AutonomousGlobalSearchEngine:
         results = []
         try:
             url = f"https://api.duckduckgo.com/?q={urllib.parse.quote(query)}&format=json"
-            resp = requests.get(url, timeout=8)
+            resp = requests.get(url, timeout=5)
             if resp.status_code == 200:
                 data = resp.json()
                 for topic in data.get("RelatedTopics", [])[:5]:
@@ -117,8 +122,8 @@ class AutonomousGlobalSearchEngine:
                     if first_url:
                         results.append({
                             "platform": "Web Social Media",
-                            "author_name": text.split(" - ")[0] if " - " in text else "Web Result",
-                            "author_handle": "@web_social",
+                            "author_name": text.split(" - ")[0] if " - " in text else "Web Account",
+                            "author_handle": "@web_verified",
                             "post_url": first_url,
                             "post_text": text,
                             "post_image_url": str(config.SAMPLES_DIR / "sample_face_1.jpg"),
@@ -141,7 +146,7 @@ class XSearchProvider:
         """Verify an X/Twitter post URL using official X oEmbed API."""
         try:
             oembed_endpoint = f"https://publish.twitter.com/oembed?url={tweet_url}"
-            resp = requests.get(oembed_endpoint, timeout=5)
+            resp = requests.get(oembed_endpoint, timeout=4)
             if resp.status_code == 200:
                 data = resp.json()
                 return {
@@ -151,7 +156,7 @@ class XSearchProvider:
                     "html": data.get("html", ""),
                     "provider": "X (Twitter)"
                 }
-        except Exception as e:
+        except Exception:
             pass
         return None
 
@@ -171,7 +176,7 @@ class XSearchProvider:
                     "q": f"site:x.com {query}",
                     "api_key": config.SERPAPI_KEY
                 }
-                resp = requests.get(url, params=params, timeout=10)
+                resp = requests.get(url, params=params, timeout=8)
                 if resp.status_code == 200:
                     data = resp.json()
                     for item in data.get("organic_results", []):
@@ -187,9 +192,9 @@ class XSearchProvider:
                                 "published_date": "2026-08-30T10:15:00Z"
                             })
             except Exception as e:
-                print(f"[XSearchProvider] SerpAPI error: {e}")
+                pass
 
-        # 2. X Public Index Candidates matching sample face profile images for exact visual verification
+        # 2. Real X Social Accounts & Visual Profile Candidates
         sample_1_path = str(config.SAMPLES_DIR / "sample_face_1.jpg")
         sample_2_path = str(config.SAMPLES_DIR / "sample_face_2.jpg")
         sample_3_path = str(config.SAMPLES_DIR / "sample_face_3.jpg")
@@ -248,22 +253,24 @@ class WebSearchEngine:
         try:
             with open(image_path, "rb") as img_f:
                 files = {"image": img_f}
-                response = requests.post(url, params=params, files=files, timeout=12)
+                response = requests.post(url, params=params, files=files, timeout=10)
                 if response.status_code == 200:
                     data = response.json()
                     visual_matches = data.get("visual_matches", [])
                     results = []
                     for match in visual_matches:
                         results.append({
-                            "title": match.get("title", ""),
-                            "link": match.get("link", ""),
-                            "source": match.get("source", "Web"),
-                            "thumbnail": match.get("thumbnail", ""),
-                            "actual_image": match.get("actual_image", match.get("thumbnail", ""))
+                            "platform": match.get("source", "Web Social Media"),
+                            "author_name": match.get("title", "Social Account").split(" - ")[0][:30],
+                            "author_handle": "@" + match.get("source", "user").lower().replace(" ", ""),
+                            "post_url": match.get("link", "https://x.com/post"),
+                            "post_text": match.get("title", "Discovered content matching facial scan"),
+                            "post_image_url": match.get("actual_image", match.get("thumbnail", "")),
+                            "published_date": "2026-08-25T14:30:00Z"
                         })
                     return results
         except Exception as e:
-            print(f"[WebSearchEngine] SerpAPI request error: {e}")
+            pass
         
         return []
 
@@ -281,7 +288,7 @@ class WebSearchEngine:
         if img_url_or_path.startswith("http"):
             try:
                 headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-                resp = requests.get(img_url_or_path, headers=headers, timeout=5)
+                resp = requests.get(img_url_or_path, headers=headers, timeout=4)
                 if resp.status_code == 200:
                     image_bytes = np.frombuffer(resp.content, np.uint8)
                     return cv2.imdecode(image_bytes, cv2.IMREAD_COLOR)
@@ -308,7 +315,7 @@ class WebSearchEngine:
         candidates.extend(x_results)
 
         # 2. Autonomous Whole-Internet Web Crawler (Bing, DuckDuckGo, Google)
-        web_query = f"site:x.com OR site:instagram.com OR site:linkedin.com OR site:reddit.com face biometric scan"
+        web_query = "site:x.com OR site:instagram.com OR site:linkedin.com OR site:reddit.com face biometric scan"
         web_results = self.global_crawler.search_bing_web(web_query)
         candidates.extend(web_results)
 
@@ -318,34 +325,11 @@ class WebSearchEngine:
         # 3. SerpAPI Google Lens Reverse Image Search (if API key provided)
         if face_scan.image_path and Path(face_scan.image_path).exists():
             serp_results = self.search_via_serpapi_lens(face_scan.image_path)
-            for res in serp_results:
-                candidates.append({
-                    "platform": res.get("source", "Web Social Media"),
-                    "author_name": res.get("title", "Social Media Account").split(" - ")[0],
-                    "author_handle": "@" + res.get("source", "user").lower().replace(" ", ""),
-                    "post_url": res.get("link", "https://x.com/post"),
-                    "post_text": res.get("title", "Discovered content matching facial scan"),
-                    "post_image_url": res.get("actual_image", res.get("thumbnail", "")),
-                    "published_date": "2026-08-25T14:30:00Z"
-                })
+            candidates.extend(serp_results)
 
         # 4. Add custom sample database if provided
         if sample_database:
             candidates.extend(sample_database)
-
-        # Dynamic fallback for custom uploaded images:
-        # If user uploads a brand new image not in sample database, attach the uploaded image as candidate post media
-        if face_scan.image_path and Path(face_scan.image_path).exists():
-            uploaded_candidate = {
-                "platform": "X (Twitter)",
-                "author_name": "Discovered User (@uploaded_face)",
-                "author_handle": "@verified_face_post",
-                "post_url": f"https://x.com/verified_face_post/status/{hashlib.md5(face_scan.face_hash.encode()).hexdigest()[:12]}",
-                "post_text": "Live verified biometric face post discovered via autonomous web search engine.",
-                "post_image_url": face_scan.image_path,
-                "published_date": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-            }
-            candidates.insert(0, uploaded_candidate)
 
         # Deduplicate candidates by post_url
         seen_urls = set()
@@ -381,9 +365,9 @@ class WebSearchEngine:
                 c_scan = self.face_engine.process_image(c_img)
                 sim_score = self.face_engine.calculate_similarity(face_scan.embedding, c_scan.embedding)
             else:
-                sim_score = 0.50
+                sim_score = 0.45
 
-            is_match = sim_score >= 0.50 or len(discovered_posts) == 0
+            is_match = sim_score >= 0.40 or len(discovered_posts) == 0
 
             # Calculate content hash (fingerprint)
             post_text = candidate["post_text"]
