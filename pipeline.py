@@ -37,21 +37,29 @@ class FaceVerificationPipeline:
         self.search_engine = WebSearchEngine(face_engine=self.face_engine)
         self.blockchain_engine = BlockchainEngine(backend_type=blockchain_backend)
 
-    def run_pipeline(self, image_input, sample_db: Optional[List[Dict[str, Any]]] = None) -> PipelineResult:
+    def run_pipeline(
+        self,
+        image_input,
+        sample_db: Optional[List[Dict[str, Any]]] = None,
+        platform_filter: str = "all"
+    ) -> PipelineResult:
         """
         Runs full end-to-end pipeline:
-        Input Face Scan -> Social Search -> Blockchain Mint -> On-Chain Re-Verification.
+        Input Face Scan -> Social Search (including X/Twitter) -> Blockchain Mint -> On-Chain Re-Verification.
         """
         start_time = time.time()
 
         # Step 1: Face Detection & Encoding
         face_scan = self.face_engine.process_image(image_input)
         if not face_scan.face_detected:
-            # Note: face_scan fallback center region handles images without strict haar face cascade hits
             pass
 
-        # Step 2: Reverse Web & Social Media Search
-        discovered_posts = self.search_engine.search_web_for_face(face_scan, sample_database=sample_db)
+        # Step 2: Reverse Web & Social Media Search (with optional X/Twitter platform filter)
+        discovered_posts = self.search_engine.search_web_for_face(
+            face_scan,
+            sample_database=sample_db,
+            platform_filter=platform_filter
+        )
         
         if not discovered_posts:
             exec_time = time.time() - start_time

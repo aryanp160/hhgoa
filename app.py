@@ -71,6 +71,13 @@ def get_pipeline(backend: str):
 
 # Sidebar Configuration
 st.sidebar.title("⚙️ Pipeline Settings")
+platform_choice = st.sidebar.selectbox(
+    "Target Social Media Platform",
+    options=["X (Twitter)", "All Social Platforms"],
+    index=0,
+    help="Select dedicated X (Twitter) search or general web search"
+)
+
 backend_choice = st.sidebar.selectbox(
     "Blockchain Network Backend",
     options=["simulated", "evm", "sepolia"],
@@ -136,8 +143,9 @@ with tab1:
         st.subheader("2️⃣ Pipeline Execution & Results")
         
         if run_btn and selected_image_input is not None:
-            with st.spinner("Processing pipeline: Face ID ➔ Reverse Web Search ➔ Minting Block ➔ Auditing..."):
-                result = pipeline.run_pipeline(selected_image_input)
+            p_filter = "x" if "X" in platform_choice else "all"
+            with st.spinner(f"Processing pipeline: Face ID ➔ Searching {platform_choice} ➔ Minting Block ➔ Auditing..."):
+                result = pipeline.run_pipeline(selected_image_input, platform_filter=p_filter)
             
             if not result.success:
                 st.error(f"Pipeline Execution Error: {result.summary_notes}")

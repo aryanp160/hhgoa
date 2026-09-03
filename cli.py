@@ -40,6 +40,7 @@ def print_banner():
 @app.command()
 def scan(
     image: str = typer.Option("samples/sample_face_1.jpg", "--image", "-i", help="Path to input face image"),
+    platform: str = typer.Option("x", "--platform", "-p", help="Platform filter: 'x', 'twitter', or 'all'"),
     blockchain: str = typer.Option(config.DEFAULT_BLOCKCHAIN_BACKEND, "--blockchain", "-b", help="Backend: 'simulated', 'evm', or 'sepolia'"),
     export: str = typer.Option("output/latest_pipeline_run.json", "--export", "-e", help="JSON export path")
 ):
@@ -65,7 +66,7 @@ def scan(
         time.sleep(0.4)
         progress.update(t1, completed=100)
 
-        t2 = progress.add_task("[bold magenta]Stage 2: Web & Social Media Reverse Search...", total=100)
+        t2 = progress.add_task(f"[bold magenta]Stage 2: Searching {platform.upper()} & Social Media...", total=100)
         progress.update(t2, completed=40)
         time.sleep(0.5)
         progress.update(t2, completed=100)
@@ -81,7 +82,7 @@ def scan(
         progress.update(t4, completed=100)
 
     # Run execution logic
-    result = pipeline.run_pipeline(str(img_path))
+    result = pipeline.run_pipeline(str(img_path), platform_filter=platform)
 
     if not result.success:
         console.print(Panel(f"[bold red]Pipeline Failed:[/bold red] {result.summary_notes}", title="Result"))

@@ -65,6 +65,18 @@ def test_web_search_engine(sample_image_path):
     assert top_post.post_hash.startswith("0x")
     assert top_post.similarity_score >= 0.0
 
+def test_x_search_provider(sample_image_path):
+    face_eng = FaceEngine()
+    scan = face_eng.process_image(sample_image_path)
+    
+    search_eng = WebSearchEngine(face_engine=face_eng)
+    x_posts = search_eng.search_web_for_face(scan, platform_filter="x")
+
+    assert len(x_posts) > 0
+    for p in x_posts:
+        assert p.platform in ["X (Twitter)", "X", "Twitter"]
+        assert "x.com" in p.post_url or "twitter.com" in p.post_url
+
 def test_blockchain_local_ledger(tmp_path):
     ledger_file = tmp_path / "test_ledger.json"
     provider = LocalLedgerProvider(ledger_path=ledger_file)
